@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import environ
+import dj_database_url
 
 env= environ.Env()
 environ.Env.read_env()
@@ -9,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
-DEBUG = os.environ.get('DEBUG')
+DEBUG = 'RENDER' not in os.environ
 
 ALLOWED_HOSTS = ['*']
 
@@ -86,10 +87,11 @@ WSGI_APPLICATION = 'AplicacionHospital.wsgi.application'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        # Feel free to alter this value to suit your needs.
+        default='postgresql://hospitalsql_user:w1Q3cNJspU9I0l7pCs6TZ5ym4cuqVqbG@dpg-cpr3ptlumphs73bv1pug-a.oregon-postgres.render.com/hospitalsql',
+        conn_max_age=600
+    )
 }
 
 
