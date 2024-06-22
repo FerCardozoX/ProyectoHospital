@@ -4,6 +4,6 @@ from .views import HomeView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('',HomeView.as_view(),name="Home"),
-    #path('GestionHospital/',include('GestionHospital.urls', namespace="GestionHospital"))
+    #path('',HomeView.as_view(),name="Home"),
+    path('GestionHospital/',include('GestionHospital.urls'))
 ]

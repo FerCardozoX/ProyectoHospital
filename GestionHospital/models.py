@@ -1,6 +1,7 @@
 from django.db import models
 
 # Create your models here.
+
 class Rol(models.Model):
     idRol = models.AutoField(primary_key=True)
     rol = models.CharField(max_length=30)
