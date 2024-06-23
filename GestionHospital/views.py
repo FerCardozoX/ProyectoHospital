@@ -3,8 +3,38 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password,check_password
 from .models import *
+
+
+
+@csrf_exempt
+@api_view(['POST'])
+def login(request):
+    usuario = request.data.get('usuario')
+    contraseña = request.data.get('contraseña')
+    
+    try:
+        user = Usuario.objects.get(usuario=usuario)
+    except Usuario.DoesNotExist:
+        user = None
+    
+    if user is not None and check_password(contraseña, user.contraseña):
+        rol = Rol.objects.get(idRol=user.idRol_id)
+        
+        response_data = {
+            'nombre': user.usuario,
+            'rol': {
+                'idRol': user.idRol_id,
+                'rol': rol.rol
+            }
+        }
+        return JsonResponse(response_data, status=202)
+    else:
+        response_data = {
+            'error': 'Usuario o Contraseña Incorrecto'
+        }
+        return JsonResponse(response_data, status=400)
  
 #GetAll
 
@@ -25,6 +55,18 @@ def getMedicos(request):
 def getCitas(request):
     Citas = Cita.objects.all().values()
     return JsonResponse(list(Citas), status=200, safe=False)
+
+@csrf_exempt
+@api_view(['GET'])
+def getAdministrativos(request):
+    Administrativos = Administrativo.objects.all().values()
+    return JsonResponse(list(Administrativos), status=200, safe=False)
+
+@csrf_exempt
+@api_view(['GET'])
+def getUsuarios(request):
+    Usuarios = Usuario.objects.all().values()
+    return JsonResponse(list(Usuarios), status=200, safe=False)
 
 #CrearPaciente
 
@@ -185,6 +227,24 @@ def buscar_medico_por_dni(request, dni):
     except Medico.DoesNotExist:
         return JsonResponse({"error": "Médico no encontrado"}, status=404)
 
+@csrf_exempt
+@api_view(['GET'])
+def buscar_administrativo_por_dni(request, dni):
+    if not dni:
+        return JsonResponse({"error": "DNI es requerido"}, status=400)
+    
+    try:
+        admin = Administrativo.objects.get(dni=dni)
+        admin_data = {
+            "idAdministrativo": admin.idAdministrativo,
+            "nombre": admin.nombre,
+            "apellido": admin.apellido,
+            "dni": admin.dni
+        }
+        return JsonResponse(admin_data, status=200)
+    except Medico.DoesNotExist:
+        return JsonResponse({"error": "Administrativo no encontrado"}, status=404)
+    
 @csrf_exempt
 @api_view(['GET'])
 def buscar_paciente_por_dni(request,dni):

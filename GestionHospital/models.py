@@ -53,6 +53,7 @@ class Administrativo(models.Model):
     idUsuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=50)
     apellido = models.CharField(max_length=50)
+    dni = models.CharField(max_length=20)
     class Meta:
         db_table = 'Administrativo'
 
