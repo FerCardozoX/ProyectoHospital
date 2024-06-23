@@ -196,7 +196,7 @@ def validar_dni_paciente(request):
     
     try:
         paciente = Paciente.objects.get(dni=dni)
-        return JsonResponse({"nombre": paciente.idPaciente,"nombre": paciente.nombre, "apellido": paciente.apellido}, status=200)
+        return JsonResponse({"idPaciente": paciente.idPaciente,"nombre": paciente.nombre, "apellido": paciente.apellido}, status=200)
     except Paciente.DoesNotExist:
         return JsonResponse({"error": "Paciente no encontrado"}, status=404)
 
