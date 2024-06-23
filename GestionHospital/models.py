@@ -14,7 +14,7 @@ class Usuario(models.Model):
     idUsuario = models.AutoField(primary_key=True)
     idRol = models.ForeignKey(Rol, on_delete=models.CASCADE)
     usuario = models.CharField(max_length=20)
-    contraseña = models.CharField(max_length=20)
+    contraseña = models.CharField(max_length=200)
     class Meta:
         db_table = 'Usuario'
 
