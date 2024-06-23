@@ -11,7 +11,7 @@ urlpatterns = [
     path('validarDniPaciente/', validar_dni_paciente, name='validardnipaciente'),
     path('buscarmedicosespecialidad/', buscar_medicos_especialidad, name='buscarmedicosespecialidad'),
     path('horariosDisponiblesMedico/', horarios_disponibles_medico, name='horariosdisponiblesmedico'),
-    path('buscarPacientePorDni/', buscar_paciente_por_dni, name='buscarpacientepordni'),
-    path('buscarMedicoPorDni/', buscar_medico_por_dni, name='buscarmedicopordni'),
+    path('buscarPacientePorDni/<str:dni>/', buscar_paciente_por_dni, name='buscarpacientepordni'),
+    path('buscarMedicoPorDni/<str:dni>/', buscar_medico_por_dni, name='buscarmedicopordni'),
     path('crearCita/', crear_cita, name='crearcita'),
 ]

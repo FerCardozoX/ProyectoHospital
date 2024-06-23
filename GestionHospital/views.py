@@ -187,11 +187,11 @@ def buscar_medico_por_dni(request, dni):
 
 @csrf_exempt
 @api_view(['GET'])
-def buscar_paciente_por_dni(request, dni):
+def buscar_paciente_por_dni(request,dni):
     if not dni:
         return JsonResponse({"error": "DNI es requerido"}, status=400)
     
-    try:
+    try: 
         paciente = Paciente.objects.get(dni=dni)
         paciente_data = {
             "idPaciente": paciente.idPaciente,
