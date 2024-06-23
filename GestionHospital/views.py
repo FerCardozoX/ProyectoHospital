@@ -161,12 +161,8 @@ def registrarAdministrativo(request):
     nombre = request.data.get('nombre')
     apellido = request.data.get('apellido')
     dni = request.data.get('dni')
-    email = request.data.get('email')
-    genero = request.data.get('genero')
-    fecha_nacimiento = request.data.get('fecha_nacimiento')
-    telefono = request.data.get('telefono')
 
-    if not all([nombre, apellido, dni, email, genero, fecha_nacimiento, telefono]):
+    if not all([nombre, apellido, dni]):
         return JsonResponse({"error": "Campos Vacios"}, status=400)
 
     if Administrativo.objects.filter(dni=dni).exists():
@@ -184,7 +180,8 @@ def registrarAdministrativo(request):
     nuevo_administrativo = Administrativo(
         idUsuario=nuevo_usuario,
         nombre=nombre,
-        apellido=apellido
+        apellido=apellido,
+        dni=dni,
     )
     nuevo_administrativo.save()
 
