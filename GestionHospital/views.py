@@ -398,7 +398,7 @@ def getallhistoriales(request):
     # Utilizar 'db' para realizar operaciones en tu base de datos MongoDB
     # Por ejemplo, buscar el paciente con paciente_id igual a 96400
     pacientes = list(db.Pacientes.find())
-
+    print(pacientes)
     # Si se encontraron pacientes, devolver los datos como contexto para renderizar en el template
     if pacientes:
         context = []
