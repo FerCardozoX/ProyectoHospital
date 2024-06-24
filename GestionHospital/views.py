@@ -607,7 +607,7 @@ def agregar_comentario_tratamiento(request, paciente_id, tratamiento_id):
 
     # Obtener el paciente por su ID
     paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-
+    print(paciente)
     # Si se encontró el paciente, buscar el tratamiento específico
     if paciente:
 
