@@ -18,4 +18,7 @@ urlpatterns = [
     path('buscarAdministrativoPorDni/<str:dni>/', buscar_administrativo_por_dni, name='buscaradminpordni'),
     path('crearCita/', crear_cita, name='crearcita'),
     path('login/', login, name='login'),
+    path('getAllHistoriales/', getallhistoriales, name='getallhistoriales'),
+    path('getHistorialUsuario/', getHistorialUsuario, name='getHistorialUsuario'),
+    path('agregarComentarioTratamiento/<str:paciente_id>/<str:tratamiento_id>', agregar_comentario_tratamiento, name='agregar_comentario_tratamiento'),
 ]

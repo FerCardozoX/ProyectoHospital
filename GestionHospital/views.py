@@ -1,10 +1,14 @@
 from datetime import datetime, time
 import json
+from multiprocessing import context
+from bson import ObjectId
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from django.contrib.auth.hashers import make_password,check_password
 from .models import *
+from pymongo import MongoClient
 
 
 
@@ -314,3 +318,316 @@ def crear_cita(request):
     nueva_cita.save()
     
     return JsonResponse({"message": "Cita creada con éxito"}, status=201)
+
+#@csrf_exempt
+#@api_view(['POST'])
+#def get_historial_medico(request):
+    dni = request.data.get('dni')
+    print(dni)
+    if not dni:
+        return JsonResponse({"error": "DNI es requerido"}, status=400)
+    try:
+        paciente = Paciente.objects.get(dni=dni)
+        paciente_id = paciente.idPaciente
+        print(paciente_id)
+    except Paciente.DoesNotExist:
+        return JsonResponse({"error": "Paciente no encontrado con ese DNI"}, status=404)
+    
+    try:
+        print('hasta aca llegamos')
+        historial_medico = HistorialMedico.objects.get(paciente_id=paciente_id)
+    except HistorialMedico.DoesNotExist:
+        return JsonResponse({"error": "Historial no encontrado"}, status=404)
+
+    # Convertir ObjectId y fechas a strings
+    historial_medico_data = {
+        "historial_id": str(historial_medico.historial_id),
+        "paciente_id": historial_medico.paciente_id,
+        "diagnosticos": [
+            {
+                "fecha": diagnostico.fecha.isoformat(),
+                "diagnostico": diagnostico.diagnostico
+            } for diagnostico in historial_medico.diagnosticos
+        ],
+        "tratamientos": [
+            {
+                "tratamiento_id": str(tratamiento.tratamiento_id),
+                "medico_id": tratamiento.medico_id,
+                "descripcion": tratamiento.descripcion,
+                "medicacion": [med.medicacion for med in tratamiento.medicacion],
+                "procedimientos": [proc.procedimiento for proc in tratamiento.procedimientos],
+                "recomendaciones": tratamiento.recomendaciones,
+                "fecha_inicio": tratamiento.fecha_inicio.isoformat(),
+                "fecha_fin": tratamiento.fecha_fin.isoformat()
+            } for tratamiento in historial_medico.tratamientos
+        ],
+        "hospitalizaciones": [
+            {
+                "hospitalizacion_id": str(hospitalizacion.hospitalizacion_id),
+                "medico_id": hospitalizacion.medico_id,
+                "fecha_ingreso": hospitalizacion.fecha_ingreso.isoformat(),
+                "fecha_alta": hospitalizacion.fecha_alta.isoformat(),
+                "detalles_tratamiento": hospitalizacion.detalles_tratamiento
+            } for hospitalizacion in historial_medico.hospitalizaciones
+        ],
+        "observaciones": historial_medico.observaciones,
+        "comentarios": [
+            {
+                "medico_id": comentario.medico_id,
+                "comentario": comentario.comentario,
+                "fecha": comentario.fecha.isoformat()
+            } for comentario in historial_medico.comentarios
+        ]
+    }
+    
+    return JsonResponse(historial_medico_data, safe=False)
+
+
+def connect_to_mongodb():
+    # Conectarse a MongoDB Atlas
+    client = MongoClient('mongodb+srv://alejosiri:IESHe4ttyetSEKJF@cluster0.yvse3ez.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0')
+    db = client['Consultorio']
+    return db
+
+@csrf_exempt
+@api_view(['GET'])
+def getallhistoriales(request):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Utilizar 'db' para realizar operaciones en tu base de datos MongoDB
+    # Por ejemplo, buscar el paciente con paciente_id igual a 96400
+    pacientes = list(db.Pacientes.find())
+
+    # Si se encontraron pacientes, devolver los datos como contexto para renderizar en el template
+    if pacientes:
+        context = []
+        for paciente in pacientes:
+            context.append({
+                'historial_id': str(paciente.get('historial_id', '')),
+                'paciente_id': paciente.get('paciente_id', ''),
+                'diagnosticos': paciente.get('diagnosticos', []),
+                'tratamientos': paciente.get('tratamientos', []),
+                'hospitalizaciones': paciente.get('hospitalizaciones', []),
+                'observaciones': paciente.get('observaciones', ''),
+            })
+        # Convertir la lista de objetos a un formato JSON válido
+        json_data = json.dumps(context)
+        return JsonResponse(json_data, safe=False, status=200)
+    else:
+        context = {'error': 'No se encontraron pacientes'}
+        return JsonResponse(context, status=404)
+    
+@csrf_exempt
+@api_view(['GET'])
+def getHistorialUsuario(request):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Utilizar 'db' para realizar operaciones en tu base de datos MongoDB
+    # Por ejemplo, buscar el paciente con paciente_id igual a 96400
+    paciente = db.Pacientes.find_one({'paciente_id': int(96400)})
+
+    # Si se encontraron pacientes, devolver los datos como contexto para renderizar en el template
+    if paciente:
+        context = {
+            'historial_id': str(paciente.get('historial_id', '')),
+            'paciente_id': paciente.get('paciente_id', ''),
+            'diagnosticos': paciente.get('diagnosticos', []),
+            'tratamientos': paciente.get('tratamientos', []),
+            'hospitalizaciones': paciente.get('hospitalizaciones', []),
+            'observaciones': paciente.get('observaciones', '')
+        }
+        # Convertir la lista de objetos a un formato JSON válido
+        json_data = json.dumps(context)
+        return JsonResponse(json_data, safe=False, status=200)
+    else:
+        context = {'error': 'No se encontraron pacientes'}
+        return JsonResponse(context, status=404)
+
+@csrf_exempt
+@api_view(['GET'])
+def get_all_tratamientos(request):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener todos los tratamientos de todos los pacientes
+    tratamientos = list(db.Pacientes.aggregate([
+        {'$unwind': '$tratamientos'},
+        {'$project': {
+            '_id': 0,
+            'tratamientos': 1
+        }}
+    ]))
+
+    # Si se encontraron tratamientos, devolver los datos como contexto para renderizar en el template
+    if tratamientos:
+        context = []
+        for tratamiento in tratamientos:
+            context.append(tratamiento['tratamientos'])
+        json_data = json.dumps(context)
+        return JsonResponse(json_data, status=200)
+    else:
+        context = {'error': 'No se encontraron tratamientos'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['GET'])
+def get_tratamientos_by_paciente_id(request, paciente_id):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener los tratamientos de un paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, obtener sus tratamientos
+    if paciente:
+        tratamientos = paciente.get('tratamientos', [])
+        json_data = json.dumps(tratamientos)
+        return JsonResponse(json_data, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['GET'])
+def get_all_hospitalizaciones(request):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener todas las hospitalizaciones de todos los pacientes
+    hospitalizaciones = list(db.Pacientes.aggregate([
+        {'$unwind': '$hospitalizaciones'},
+        {'$project': {
+            '_id': 0,
+            'hospitalizaciones': 1
+        }}
+    ]))
+
+    # Si se encontraron hospitalizaciones, devolver los datos como contexto para renderizar en el template
+    if hospitalizaciones:
+        context = []
+        for hospitalizacion in hospitalizaciones:
+            context.append(hospitalizacion['hospitalizaciones'])
+        json_data = json.dumps(context)
+        return JsonResponse(json_data, status=200)
+    else:
+        context = {'error': 'No se encontraron hospitalizaciones'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['GET'])
+def get_hospitalizaciones_by_paciente_id(request, paciente_id):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener las hospitalizaciones de un paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, obtener sus hospitalizaciones
+    if paciente:
+        hospitalizaciones = paciente.get('hospitalizaciones', [])
+        json_data = json.dumps(hospitalizaciones)
+        return JsonResponse(json_data, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_tratamiento(request, paciente_id):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+
+    # Obtener el paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, agregar un nuevo tratamiento
+    if paciente:
+        tratamiento_data = json.loads(request.body)
+        tratamiento_nuevo = {
+            "tratamiento_id": ObjectId(),
+            "medico_id": tratamiento_data.get('medico_id', ''),
+            "descripcion": tratamiento_data.get('descripcion', ''),
+            "medicacion": tratamiento_data.get('medicacion', []),
+            "procedimientos": tratamiento_data.get('procedimientos', []),
+            "comentarios": tratamiento_data.get('comentarios', []),
+            "recomendaciones": tratamiento_data.get('recomendaciones', ''),
+            "fecha_inicio": tratamiento_data.get('fecha_inicio', ''),
+            "fecha_fin": tratamiento_data.get('fecha_fin', '')
+        }
+        # Agregar el nuevo tratamiento a la lista de tratamientos del paciente
+        db.Pacientes.update_one({'paciente_id': int(paciente_id)}, {'$push': {'tratamientos': tratamiento_nuevo}})
+        return JsonResponse({"message": "Tratamiento agregado correctamente"}, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_hospitalizacion(request, paciente_id):
+
+
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+
+    # Obtener el paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, agregar una nueva hospitalización
+    if paciente:
+        hospitalizacion_data = json.loads(request.body)
+        hospitalizacion_nueva = {
+            "hospitalizacion_id": ObjectId(),
+            "medico_id": hospitalizacion_data.get('medico_id', ''),
+            "fecha_ingreso": hospitalizacion_data.get('fecha_ingreso', ''),
+            "fecha_alta": hospitalizacion_data.get('fecha_alta', ''),
+            "detalles_tratamiento": hospitalizacion_data.get('detalles_tratamiento', '')
+        }
+        # Agregar la nueva hospitalización a la lista de hospitalizaciones del paciente
+        db.Pacientes.update_one({'paciente_id': int(paciente_id)}, {'$push': {'hospitalizaciones': hospitalizacion_nueva}})
+        return JsonResponse({"message": "Hospitalización agregada correctamente"}, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_comentario_tratamiento(request, paciente_id, tratamiento_id):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+
+    # Obtener el paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, buscar el tratamiento específico
+    if paciente:
+
+        comentario_data =request.POST
+        comentario_nuevo = {
+            "medico_id": comentario_data.get('medico_id', ''),
+            "medico_nombre": comentario_data.get('medico_nombre', ''),
+            "comentario": comentario_data.get('comentario', ''),
+            "fecha": comentario_data.get('fecha', '')
+        }
+
+        # Actualizar el tratamiento específico con el nuevo comentario
+        db.Pacientes.update_one(
+            {'paciente_id': int(paciente_id), 'tratamientos.tratamiento_id': tratamiento_id},
+            {'$push': {'tratamientos.$.comentarios': comentario_nuevo}}
+        )
+        
+        return JsonResponse({"message": "Comentario agregado correctamente"}, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+

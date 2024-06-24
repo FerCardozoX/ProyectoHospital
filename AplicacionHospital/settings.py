@@ -3,6 +3,8 @@ import os
 import environ
 import dj_database_url
 
+
+
 env= environ.Env()
 environ.Env.read_env()
 
@@ -92,6 +94,7 @@ DATABASES = {
         default='postgresql://hospitalsql_user:w1Q3cNJspU9I0l7pCs6TZ5ym4cuqVqbG@dpg-cpr3ptlumphs73bv1pug-a.oregon-postgres.render.com/hospitalsql',
         conn_max_age=600
     )
+    
 }
 
 
