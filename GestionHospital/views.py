@@ -124,11 +124,13 @@ def registrar_Medico(request):
     genero = request.data.get('genero')
     fecha_nacimiento = request.data.get('fecha_nacimiento')
     telefono = request.data.get('telefono')
+    horarioEntrada = request.data.get('horarioEntrada')
+    horarioSalida = request.data.get('horarioSalida')
     especialidad = request.data.get('especialidad')
     matricula = request.data.get('matricula')
 
     print('La info llegó bien')
-    if not all([nombre, apellido, dni, email, genero, fecha_nacimiento, telefono, especialidad, matricula]):
+    if not all([nombre, apellido, dni, email, genero, fecha_nacimiento, telefono, horarioEntrada,horarioSalida, especialidad, matricula]):
         return JsonResponse({"error": "Campos Vacios"}, status=400)
     
     print('Vacios no estan')
@@ -156,6 +158,8 @@ def registrar_Medico(request):
         genero=genero,
         fecha_nacimiento=fecha_nacimiento,
         telefono=telefono,
+        horarioEntrada=horarioEntrada,
+        horarioSalida=horarioSalida,
         especialidad=especialidad,
         matricula=matricula
     )
@@ -244,10 +248,12 @@ def editMedico(request, dni):
     genero = request.data.get('genero')
     fecha_nacimiento = request.data.get('fecha_nacimiento')
     telefono = request.data.get('telefono')
+    horarioEntrada = request.data.get('horarioEntrada')
+    horarioSalida = request.data.get('horarioSalida')
     especialidad = request.data.get('especialidad')
     matricula = request.data.get('matricula')
 
-    if not all([nombre, apellido, email, genero, fecha_nacimiento, telefono, especialidad, matricula]):
+    if not all([nombre, apellido, email, genero, fecha_nacimiento, telefono, horarioEntrada,horarioSalida,especialidad, matricula]):
         return JsonResponse({"error": "Campos Vacios"}, status=400)
 
     medico.nombre = nombre
@@ -256,6 +262,8 @@ def editMedico(request, dni):
     medico.genero = genero
     medico.fecha_nacimiento = fecha_nacimiento
     medico.telefono = telefono
+    horarioEntrada=horarioEntrada
+    horarioSalida=horarioSalida
     medico.especialidad = especialidad
     medico.matricula = matricula
     medico.save()
