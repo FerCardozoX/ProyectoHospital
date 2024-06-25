@@ -43,6 +43,8 @@ class Medico(models.Model):
     genero = models.CharField(max_length=20)
     fecha_nacimiento = models.DateTimeField()
     telefono = models.CharField(max_length=30)
+    horarioEntrada=models.DateTimeField()
+    horarioSalida=models.DateTimeField()
     especialidad = models.CharField(max_length=50)
     matricula = models.CharField(max_length=10)
     class Meta:
