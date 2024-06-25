@@ -197,441 +197,6 @@ def registrarAdministrativo(request):
 
     return JsonResponse({"message": "Administrativo Creado con Éxito"}, status=201)
 
-@csrf_exempt
-@api_view(['POST'])
-def validar_dni_paciente(request):
-    dni = request.data.get('dni')
-    if not dni:
-        return JsonResponse({"error": "DNI es requerido"}, status=400)
-    
-    try:
-        paciente = Paciente.objects.get(dni=dni)
-        return JsonResponse({"idPaciente": paciente.idPaciente,"nombre": paciente.nombre, "apellido": paciente.apellido}, status=200)
-    except Paciente.DoesNotExist:
-        return JsonResponse({"error": "Paciente no encontrado"}, status=404)
-
-@csrf_exempt
-@api_view(['GET'])
-def buscar_medico_por_dni(request, dni):
-    if not dni:
-        return JsonResponse({"error": "DNI es requerido"}, status=400)
-    
-    try:
-        medico = Medico.objects.get(dni=dni)
-        medico_data = {
-            "idMedico": medico.idMedico,
-            "nombre": medico.nombre,
-            "apellido": medico.apellido,
-            "dni": medico.dni,
-            "email": medico.email,
-            "genero": medico.genero,
-            "fecha_nacimiento": medico.fecha_nacimiento.strftime('%Y-%m-%d'),
-            "telefono": medico.telefono,
-            "especialidad": medico.especialidad,
-            "matricula": medico.matricula
-        }
-        return JsonResponse(medico_data, status=200)
-    except Medico.DoesNotExist:
-        return JsonResponse({"error": "Médico no encontrado"}, status=404)
-
-@csrf_exempt
-@api_view(['GET'])
-def buscar_administrativo_por_dni(request, dni):
-    if not dni:
-        return JsonResponse({"error": "DNI es requerido"}, status=400)
-    
-    try:
-        admin = Administrativo.objects.get(dni=dni)
-        admin_data = {
-            "idAdministrativo": admin.idAdministrativo,
-            "nombre": admin.nombre,
-            "apellido": admin.apellido,
-            "dni": admin.dni
-        }
-        return JsonResponse(admin_data, status=200)
-    except Medico.DoesNotExist:
-        return JsonResponse({"error": "Administrativo no encontrado"}, status=404)
-    
-@csrf_exempt
-@api_view(['GET'])
-def buscar_paciente_por_dni(request,dni):
-    if not dni:
-        return JsonResponse({"error": "DNI es requerido"}, status=400)
-    
-    try: 
-        paciente = Paciente.objects.get(dni=dni)
-        paciente_data = {
-            "idPaciente": paciente.idPaciente,
-            "nombre": paciente.nombre,
-            "apellido": paciente.apellido,
-            "dni": paciente.dni,
-            "email": paciente.email,
-            "fecha_nacimiento": paciente.fecha_nacimiento.strftime('%Y-%m-%d'),
-            "genero": paciente.genero,
-            "telefono": paciente.telefono,
-            "contacto_emergencia": paciente.contacto_emergencia
-        }
-        return JsonResponse(paciente_data, status=200)
-    except Paciente.DoesNotExist:
-        return JsonResponse({"error": "Paciente no encontrado"}, status=404)
-
-
-@csrf_exempt
-@api_view(['POST'])
-def buscar_medicos_especialidad(request):
-    especialidad = request.data.get('especialidad')
-    if not especialidad:
-        return JsonResponse({"error": "Especialidad es requerida"}, status=400)
-    
-    medicos = Medico.objects.filter(especialidad=especialidad).values('idMedico', 'nombre', 'apellido', 'dni')
-    return JsonResponse(list(medicos), safe=False, status=200)
-
-@csrf_exempt
-@api_view(['POST'])
-def horarios_disponibles_medico(request):
-    idMedico = request.data.get('idMedico')
-    fecha = request.data.get('fecha')
-    if not idMedico or not fecha:
-        return JsonResponse({"error": "ID del Médico y Fecha son requeridos"}, status=400)
-    
-    fecha_dt = datetime.strptime(fecha, '%Y-%m-%d')
-    if fecha_dt.weekday() >= 5:  # Sabado o Domingo
-        return JsonResponse({"error": "No hay atención los fines de semana"}, status=400)
-    
-    horarios_ocupados = Cita.objects.filter(idMedico=idMedico, fechaCita__date=fecha_dt).values_list('fechaCita__time', flat=True)
-    todos_los_horarios = [datetime.strptime(f"{hora}:00", '%H:%M').time() for hora in range(9, 19)]
-    horarios_disponibles = [hora.strftime('%H:%M') for hora in todos_los_horarios if hora not in horarios_ocupados]
-    
-    return JsonResponse({"horarios_disponibles": horarios_disponibles}, status=200)
-
-@csrf_exempt
-@api_view(['POST'])
-def crear_cita(request):
-    idPaciente = request.data.get('idPaciente')
-    idMedico = request.data.get('idMedico')
-    fechaCita = request.data.get('fechaCita')
-    estado = request.data.get('estado')
-    
-    if not idPaciente or not idMedico or not fechaCita:
-        return JsonResponse({"error": "Todos los campos son requeridos"}, status=400)
-    
-    fechaCita_dt = datetime.strptime(fechaCita, '%Y-%m-%dT%H:%M:%S')
-    
-    if Cita.objects.filter(idMedico=idMedico, fechaCita=fechaCita_dt).exists():
-        return JsonResponse({"error": "Horario no disponible"}, status=400)
-    
-    nueva_cita = Cita(idPaciente_id=idPaciente, idMedico_id=idMedico, fechaCita=fechaCita_dt, estado=estado)
-    nueva_cita.save()
-    
-    return JsonResponse({"message": "Cita creada con éxito"}, status=201)
-
-
-def connect_to_mongodb():
-    try:
-        # Conectarse a MongoDB Atlas con certificación SSL
-        client = MongoClient('mongodb+srv://alejosiri:IESHe4ttyetSEKJF@cluster0.yvse3ez.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', tlsCAFile=certifi.where())
-        db = client['Consultorio']
-        return db 
-    except Exception as e:
-        print(f"Error al conectar a MongoDB: {e}")
-        return None
-    
-@csrf_exempt
-@api_view(['POST'])
-def agregar_historial_medico_vacio(request):
-    try:
-        paciente_id = request.data.get('idPaciente')
-        if not paciente_id:
-            return JsonResponse({'error': 'Falta el campo paciente_id'}, status=400)
-
-        db = connect_to_mongodb()
-        if db is None:
-            return JsonResponse({'error': 'No se pudo conectar a MongoDB'}, status=500)
-
-        nueva_instancia = db.Pacientes.insert_one({'paciente_id': paciente_id})
-        return JsonResponse({'mensaje': 'Nueva instancia creada', 'id': str(nueva_instancia.inserted_id)}, status=201)
-    except Exception as e:
-        print(f"Error al agregar historial médico vacío: {e}")
-        return JsonResponse({'error': 'Error al agregar historial médico vacío'}, status=500)
-
-@csrf_exempt
-@api_view(['GET'])
-def getallhistoriales(request):
-    db = connect_to_mongodb()
-    if db is None:
-        return JsonResponse({'error': 'No se pudo conectar a MongoDB'}, status=500)
-
-    try:
-        pacientes = list(db.Pacientes.find())
-        if pacientes:
-            context = []
-            for paciente in pacientes:
-                context.append({
-                    'historial_id': str(paciente.get('historial_id', '')),
-                    'paciente_id': paciente.get('paciente_id', ''),
-                    'diagnosticos': paciente.get('diagnosticos', []),
-                    'tratamientos': paciente.get('tratamientos', []),
-                    'hospitalizaciones': paciente.get('hospitalizaciones', []),
-                    'observaciones': paciente.get('observaciones', ''),
-                })
-            json_data = json.dumps(context)
-            return JsonResponse(json_data, safe=False, status=200)
-        else:
-            return JsonResponse({'error': 'No se encontraron pacientes'}, status=404)
-    except Exception as e:
-        print(f"Error al consultar pacientes: {e}")
-        return JsonResponse({'error': 'Error al consultar pacientes'}, status=500)
-    
-@csrf_exempt
-@api_view(['GET'])
-def getHistorialUsuario(request):
-    paciente_id = request.data.get('idPaciente')
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-    # Utilizar 'db' para realizar operaciones en tu base de datos MongoDB
-    paciente = db.Pacientes.find_one({'paciente_id': paciente_id})
-
-    # Si se encontraron pacientes, devolver los datos como contexto para renderizar en el template
-    if paciente:
-        context = {
-            'historial_id': str(paciente.get('historial_id', '')),
-            'paciente_id': paciente.get('paciente_id', ''),
-            'diagnosticos': paciente.get('diagnosticos', []),
-            'tratamientos': paciente.get('tratamientos', []),
-            'hospitalizaciones': paciente.get('hospitalizaciones', []),
-            'observaciones': paciente.get('observaciones', '')
-        }
-        # Convertir la lista de objetos a un formato JSON válido
-        json_data = json.dumps(context)
-        return JsonResponse(json_data, safe=False, status=200)
-    else:
-        context = {'error': 'No se encontraron pacientes'}
-        return JsonResponse(context, status=404)
-
-@csrf_exempt
-@api_view(['GET'])
-def get_all_tratamientos(request):
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-    # Obtener todos los tratamientos de todos los pacientes
-    tratamientos = list(db.Pacientes.aggregate([
-        {'$unwind': '$tratamientos'},
-        {'$project': {
-            '_id': 0,
-            'tratamientos': 1
-        }}
-    ]))
-
-    # Si se encontraron tratamientos, devolver los datos como contexto para renderizar en el template
-    if tratamientos:
-        context = []
-        for tratamiento in tratamientos:
-            context.append(tratamiento['tratamientos'])
-        return JsonResponse(context, safe=False, status=200)
-    else:
-        context = {'error': 'No se encontraron tratamientos'}
-        return JsonResponse(context, status=404)
-
-
-@csrf_exempt
-@api_view(['GET'])
-def get_tratamientos_by_paciente_id(request, paciente_id):
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-    # Obtener los tratamientos de un paciente por su ID
-    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-
-    # Si se encontró el paciente, obtener sus tratamientos
-    if paciente:
-        tratamientos = paciente.get('tratamientos', [])
-        json_data = json.dumps(tratamientos)
-        return JsonResponse(json_data,safe=False ,status=200)
-    else:
-        context = {'error': 'No se encontró el paciente'}
-        return JsonResponse(context, status=404)
-
-
-@csrf_exempt
-@api_view(['GET'])
-def get_all_hospitalizaciones(request):
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-    # Obtener todas las hospitalizaciones de todos los pacientes
-    hospitalizaciones = list(db.Pacientes.aggregate([
-        {'$unwind': '$hospitalizaciones'},
-        {'$project': {
-            '_id': 0,
-            'hospitalizaciones': 1
-        }}
-    ]))
-
-    # Si se encontraron hospitalizaciones, devolver los datos como contexto para renderizar en el template
-    if hospitalizaciones:
-        context = []
-        for hospitalizacion in hospitalizaciones:
-            context.append(hospitalizacion['hospitalizaciones'])
-        json_data = json.dumps(context)
-        return JsonResponse(json_data,safe=False, status=200)
-    else:
-        context = {'error': 'No se encontraron hospitalizaciones'}
-        return JsonResponse(context, status=404)
-
-
-@csrf_exempt
-@api_view(['GET'])
-def get_hospitalizaciones_by_paciente_id(request, paciente_id):
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-    # Obtener las hospitalizaciones de un paciente por su ID
-    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-
-    # Si se encontró el paciente, obtener sus hospitalizaciones
-    if paciente:
-        hospitalizaciones = paciente.get('hospitalizaciones', [])
-        json_data = json.dumps(hospitalizaciones)
-        return JsonResponse(json_data, safe=False ,status=200)
-    else:
-        context = {'error': 'No se encontró el paciente'}
-        return JsonResponse(context, status=404)
-
-@csrf_exempt
-@api_view(['POST'])
-def agregar_tratamiento(request, paciente_id):
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-
-    # Obtener el paciente por su ID
-    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-
-    # Si se encontró el paciente, agregar un nuevo tratamiento
-    if paciente:
-        
-        tratamiento_nuevo = {
-            "tratamiento_id": ObjectId(),
-            "medico_id": request.data.get('medico_id', ''),
-            "descripcion": request.data.get('descripcion', ''),
-            "medicacion": request.data.get('medicacion', []),
-            "procedimientos": request.data.get('procedimientos', []),
-            "comentarios": request.data.get('comentarios', []),
-            "recomendaciones": request.data.get('recomendaciones', ''),
-            "fecha_inicio": request.data.get('fecha_inicio', ''),
-            "fecha_fin": request.data.get('fecha_fin', '')
-        }
-        # Agregar el nuevo tratamiento a la lista de tratamientos del paciente
-        db.Pacientes.update_one({'paciente_id': int(paciente_id)}, {'$push': {'tratamientos': tratamiento_nuevo}})
-        return JsonResponse({"message": "Tratamiento agregado correctamente"},safe=False ,status=200)
-    else:
-        context = {'error': 'No se encontró el paciente'}
-        return JsonResponse(context, status=404)
-
-
-@csrf_exempt
-@api_view(['POST'])
-def agregar_hospitalizacion(request, paciente_id):
-
-
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-
-    # Obtener el paciente por su ID
-    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-
-    # Si se encontró el paciente, agregar una nueva hospitalización
-    if paciente:
-        hospitalizacion_data = json.loads(request.body)
-        hospitalizacion_nueva = {
-            "hospitalizacion_id": ObjectId(),
-            "medico_id": hospitalizacion_data.get('medico_id', ''),
-            "fecha_ingreso": hospitalizacion_data.get('fecha_ingreso', ''),
-            "fecha_alta": hospitalizacion_data.get('fecha_alta', ''),
-            "detalles_tratamiento": hospitalizacion_data.get('detalles_tratamiento', '')
-        }
-        # Agregar la nueva hospitalización a la lista de hospitalizaciones del paciente
-        db.Pacientes.update_one({'paciente_id': int(paciente_id)}, {'$push': {'hospitalizaciones': hospitalizacion_nueva}})
-        return JsonResponse({"message": "Hospitalización agregada correctamente"}, safe=False,status=200)
-    else:
-        context = {'error': 'No se encontró el paciente'}
-        return JsonResponse(context, status=404)
-
-
-@csrf_exempt
-@api_view(['POST'])
-def agregar_comentario_tratamiento(request, paciente_id, tratamiento_id):
-    # Conectar a MongoDB
-    db = connect_to_mongodb()
-    print(db)
-
-    # Obtener el paciente por su ID
-    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-    print(paciente)
-    # Si se encontró el paciente, buscar el tratamiento específico
-    if paciente:
-
-        comentario_data =request.POST
-        comentario_nuevo = {
-            "medico_id": comentario_data.get('medico_id', ''),
-            "medico_nombre": comentario_data.get('medico_nombre', ''),
-            "comentario": comentario_data.get('comentario', ''),
-            "fecha": comentario_data.get('fecha', '')
-        }
-
-        # Actualizar el tratamiento específico con el nuevo comentario
-        db.Pacientes.update_one(
-            {'paciente_id': int(paciente_id), 'tratamientos.tratamiento_id': tratamiento_id},
-            {'$push': {'tratamientos.$.comentarios': comentario_nuevo}}
-        )
-        
-        return JsonResponse({"message": "Comentario agregado correctamente"}, status=200)
-    else:
-        context = {'error': 'No se encontró el paciente'}
-        return JsonResponse(context, status=404)
-
-
-@csrf_exempt
-@api_view(['POST'])
-def agregar_diagnostico(request, paciente_id):
-    try:
-        # Conectar a MongoDB
-        db = connect_to_mongodb()
-        if db is None:
-            return JsonResponse({'error': 'No se pudo conectar a MongoDB'}, status=500)
-
-        # Obtener el paciente por su ID
-        paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
-        if not paciente:
-            return JsonResponse({'error': 'No se encontró el paciente'}, status=404)
-
-        # Obtener los datos del diagnóstico desde el cuerpo de la solicitud
-        fecha = request.data.get('fecha')
-        diagnostico = request.data.get('diagnostico')
-
-        if not all([fecha, diagnostico]):
-            return JsonResponse({'error': 'Faltan campos requeridos'}, status=400)
-
-        # Crear el nuevo diagnóstico
-        nuevo_diagnostico = {
-            'fecha': fecha,
-            'diagnostico': diagnostico
-        }
-
-        # Actualizar el historial del paciente con el nuevo diagnóstico
-        db.Pacientes.update_one(
-            {'paciente_id': int(paciente_id)},
-            {'$push': {'diagnosticos': nuevo_diagnostico}}
-        )
-
-        return JsonResponse({'mensaje': 'Diagnóstico agregado correctamente'}, safe=False,status=200)
-    except Exception as e:
-        print(f"Error al agregar diagnóstico: {e}")
-        return JsonResponse({'error': 'Error al agregar diagnóstico'}, status=500)
-    
 # Editar paciente
 @csrf_exempt
 @api_view(['PUT'])
@@ -780,3 +345,462 @@ def editarEstadoCita(request, idCita):
     cita.save()
 
     return JsonResponse({"message": "Estado de la cita actualizado con éxito"}, status=200)
+
+
+#Validaciones
+
+@csrf_exempt
+@api_view(['POST'])
+def validar_dni_paciente(request):
+    dni = request.data.get('dni')
+    if not dni:
+        return JsonResponse({"error": "DNI es requerido"}, status=400)
+    
+    try:
+        paciente = Paciente.objects.get(dni=dni)
+        return JsonResponse({"idPaciente": paciente.idPaciente,"nombre": paciente.nombre, "apellido": paciente.apellido}, status=200)
+    except Paciente.DoesNotExist:
+        return JsonResponse({"error": "Paciente no encontrado"}, status=404)
+
+@csrf_exempt
+@api_view(['GET'])
+def buscar_medico_por_dni(request, dni):
+    if not dni:
+        return JsonResponse({"error": "DNI es requerido"}, status=400)
+    
+    try:
+        medico = Medico.objects.get(dni=dni)
+        medico_data = {
+            "idMedico": medico.idMedico,
+            "nombre": medico.nombre,
+            "apellido": medico.apellido,
+            "dni": medico.dni,
+            "email": medico.email,
+            "genero": medico.genero,
+            "fecha_nacimiento": medico.fecha_nacimiento.strftime('%Y-%m-%d'),
+            "telefono": medico.telefono,
+            "especialidad": medico.especialidad,
+            "matricula": medico.matricula
+        }
+        return JsonResponse(medico_data, status=200)
+    except Medico.DoesNotExist:
+        return JsonResponse({"error": "Médico no encontrado"}, status=404)
+
+@csrf_exempt
+@api_view(['GET'])
+def buscar_administrativo_por_dni(request, dni):
+    if not dni:
+        return JsonResponse({"error": "DNI es requerido"}, status=400)
+    
+    try:
+        admin = Administrativo.objects.get(dni=dni)
+        admin_data = {
+            "idAdministrativo": admin.idAdministrativo,
+            "nombre": admin.nombre,
+            "apellido": admin.apellido,
+            "dni": admin.dni
+        }
+        return JsonResponse(admin_data, status=200)
+    except Medico.DoesNotExist:
+        return JsonResponse({"error": "Administrativo no encontrado"}, status=404)
+    
+@csrf_exempt
+@api_view(['GET'])
+def buscar_paciente_por_dni(request,dni):
+    if not dni:
+        return JsonResponse({"error": "DNI es requerido"}, status=400)
+    
+    try: 
+        paciente = Paciente.objects.get(dni=dni)
+        paciente_data = {
+            "idPaciente": paciente.idPaciente,
+            "nombre": paciente.nombre,
+            "apellido": paciente.apellido,
+            "dni": paciente.dni,
+            "email": paciente.email,
+            "fecha_nacimiento": paciente.fecha_nacimiento.strftime('%Y-%m-%d'),
+            "genero": paciente.genero,
+            "telefono": paciente.telefono,
+            "contacto_emergencia": paciente.contacto_emergencia
+        }
+        return JsonResponse(paciente_data, status=200)
+    except Paciente.DoesNotExist:
+        return JsonResponse({"error": "Paciente no encontrado"}, status=404)
+
+
+@csrf_exempt
+@api_view(['POST'])
+def buscar_medicos_especialidad(request):
+    especialidad = request.data.get('especialidad')
+    if not especialidad:
+        return JsonResponse({"error": "Especialidad es requerida"}, status=400)
+    
+    medicos = Medico.objects.filter(especialidad=especialidad).values('idMedico', 'nombre', 'apellido', 'dni')
+    return JsonResponse(list(medicos), safe=False, status=200)
+
+@csrf_exempt
+@api_view(['POST'])
+def horarios_disponibles_medico(request):
+    idMedico = request.data.get('idMedico')
+    fecha = request.data.get('fecha')
+    if not idMedico or not fecha:
+        return JsonResponse({"error": "ID del Médico y Fecha son requeridos"}, status=400)
+    
+    fecha_dt = datetime.strptime(fecha, '%Y-%m-%d')
+    if fecha_dt.weekday() >= 5:  # Sabado o Domingo
+        return JsonResponse({"error": "No hay atención los fines de semana"}, status=400)
+    
+    horarios_ocupados = Cita.objects.filter(idMedico=idMedico, fechaCita__date=fecha_dt).values_list('fechaCita__time', flat=True)
+    todos_los_horarios = [datetime.strptime(f"{hora}:00", '%H:%M').time() for hora in range(9, 19)]
+    horarios_disponibles = [hora.strftime('%H:%M') for hora in todos_los_horarios if hora not in horarios_ocupados]
+    
+    return JsonResponse({"horarios_disponibles": horarios_disponibles}, status=200)
+
+@csrf_exempt
+@api_view(['POST'])
+def crear_cita(request):
+    idPaciente = request.data.get('idPaciente')
+    idMedico = request.data.get('idMedico')
+    fechaCita = request.data.get('fechaCita')
+    estado = request.data.get('estado')
+    
+    if not idPaciente or not idMedico or not fechaCita:
+        return JsonResponse({"error": "Todos los campos son requeridos"}, status=400)
+    
+    fechaCita_dt = datetime.strptime(fechaCita, '%Y-%m-%dT%H:%M:%S')
+    
+    if Cita.objects.filter(idMedico=idMedico, fechaCita=fechaCita_dt).exists():
+        return JsonResponse({"error": "Horario no disponible"}, status=400)
+    
+    nueva_cita = Cita(idPaciente_id=idPaciente, idMedico_id=idMedico, fechaCita=fechaCita_dt, estado=estado)
+    nueva_cita.save()
+    
+    return JsonResponse({"message": "Cita creada con éxito"}, status=201)
+
+
+#MongoDB
+
+def connect_to_mongodb():
+    try:
+        # Conectarse a MongoDB Atlas con certificación SSL
+        client = MongoClient('mongodb+srv://alejosiri:IESHe4ttyetSEKJF@cluster0.yvse3ez.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', tlsCAFile=certifi.where())
+        db = client['Consultorio']
+        return db 
+    except Exception as e:
+        print(f"Error al conectar a MongoDB: {e}")
+        return None
+    
+
+
+
+@csrf_exempt
+@api_view(['GET'])
+def getallhistoriales(request):
+    db = connect_to_mongodb()
+    if db is None:
+        return JsonResponse({'error': 'No se pudo conectar a MongoDB'}, status=500)
+
+    try:
+        pacientes = list(db.Pacientes.find())
+        if pacientes:
+            context = []
+            for paciente in pacientes:
+                context.append({
+                    'historial_id': paciente.get('historial_id', ''),
+                    'paciente_id': paciente.get('paciente_id', ''),
+                    'diagnosticos': paciente.get('diagnosticos', []),
+                    'tratamientos': paciente.get('tratamientos', []),
+                    'hospitalizaciones': paciente.get('hospitalizaciones', []),
+                    'observaciones': paciente.get('observaciones', ''),
+                })
+            json_data = json.dumps(context)
+            return JsonResponse(json_data, safe=False, status=200)
+        else:
+            return JsonResponse({'error': 'No se encontraron pacientes'}, status=404)
+    except Exception as e:
+        print(f"Error al consultar pacientes: {e}")
+        return JsonResponse({'error': 'Error al consultar pacientes'}, status=500)
+    
+@csrf_exempt
+@api_view(['GET'])
+def getHistorialUsuario(request):
+    paciente_id = request.data.get('idPaciente')
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Utilizar 'db' para realizar operaciones en tu base de datos MongoDB
+    paciente = db.Pacientes.find_one({'paciente_id': paciente_id})
+
+    # Si se encontraron pacientes, devolver los datos como contexto para renderizar en el template
+    if paciente:
+        context = {
+            'historial_id': paciente.get('historial_id', ''),
+            'paciente_id': paciente.get('paciente_id', ''),
+            'diagnosticos': paciente.get('diagnosticos', []),
+            'tratamientos': paciente.get('tratamientos', []),
+            'hospitalizaciones': paciente.get('hospitalizaciones', []),
+            'observaciones': paciente.get('observaciones', '')
+        }
+        # Convertir la lista de objetos a un formato JSON válido
+        json_data = json.dumps(context)
+        return JsonResponse(json_data, safe=False, status=200)
+    else:
+        context = {'error': 'No se encontraron pacientes'}
+        return JsonResponse(context, status=404)
+
+@csrf_exempt
+@api_view(['GET'])
+def get_all_tratamientos(request):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener todos los tratamientos de todos los pacientes
+    tratamientos = list(db.Pacientes.aggregate([
+        {'$unwind': '$tratamientos'},
+        {'$project': {
+            '_id': 0,
+            'tratamientos': 1
+        }}
+    ]))
+
+    # Si se encontraron tratamientos, devolver los datos como contexto para renderizar en el template
+    if tratamientos:
+        context = []
+        for tratamiento in tratamientos:
+            context.append(tratamiento['tratamientos'])
+        return JsonResponse(context, safe=False, status=200)
+    else:
+        context = {'error': 'No se encontraron tratamientos'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['GET'])
+def get_tratamientos_by_paciente_id(request, paciente_id):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener los tratamientos de un paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, obtener sus tratamientos
+    if paciente:
+        tratamientos = paciente.get('tratamientos', [])
+        json_data = json.dumps(tratamientos)
+        return JsonResponse(json_data,safe=False ,status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['GET'])
+def get_all_hospitalizaciones(request):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener todas las hospitalizaciones de todos los pacientes
+    hospitalizaciones = list(db.Pacientes.aggregate([
+        {'$unwind': '$hospitalizaciones'},
+        {'$project': {
+            '_id': 0,
+            'hospitalizaciones': 1
+        }}
+    ]))
+
+    # Si se encontraron hospitalizaciones, devolver los datos como contexto para renderizar en el template
+    if hospitalizaciones:
+        context = []
+        for hospitalizacion in hospitalizaciones:
+            context.append(hospitalizacion['hospitalizaciones'])
+        json_data = json.dumps(context)
+        return JsonResponse(json_data,safe=False, status=200)
+    else:
+        context = {'error': 'No se encontraron hospitalizaciones'}
+        return JsonResponse(context, status=404)
+
+
+@csrf_exempt
+@api_view(['GET'])
+def get_hospitalizaciones_by_paciente_id(request, paciente_id):
+    # Conectar a MongoDB
+    db = connect_to_mongodb()
+    print(db)
+    # Obtener las hospitalizaciones de un paciente por su ID
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    # Si se encontró el paciente, obtener sus hospitalizaciones
+    if paciente:
+        hospitalizaciones = paciente.get('hospitalizaciones', [])
+        json_data = json.dumps(hospitalizaciones)
+        return JsonResponse(json_data, safe=False ,status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+def get_next_sequence_value(db, sequence_name):
+    try:
+        sequence_document = db.Counters.find_one_and_update(
+            {"_id": sequence_name},
+            {"$inc": {"sequence_value": 1}},
+            return_document=True
+        )
+        return sequence_document["sequence_value"]
+    except Exception as e:
+        print(f"Error al obtener el siguiente valor de secuencia: {e}")
+        return None
+
+def initialize_counters(db):
+    try:
+        counters = ["tratamiento_id", "hospitalizacion_id", "diagnostico_id", "comentario_id", "historial_id"]
+        for counter in counters:
+            db.Counters.update_one(
+                {"_id": counter},
+                {"$setOnInsert": {"sequence_value": 0}},
+                upsert=True
+            )
+    except Exception as e:
+        print(f"Error al inicializar contadores: {e}")
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_historial_medico_vacio(request):
+    try:
+        paciente_id = request.data.get('idPaciente')
+        if not paciente_id:
+            return JsonResponse({'error': 'Falta el campo paciente_id'}, status=400)
+
+        db = connect_to_mongodb()
+        if db is None:
+            return JsonResponse({'error': 'No se pudo conectar a MongoDB'}, status=500)
+
+        initialize_counters(db)
+        historial_id = get_next_sequence_value(db, "historial_id")
+        nuevo_historial = {
+            "historial_id": historial_id,
+            "paciente_id": paciente_id,
+            "diagnosticos": [],
+            "tratamientos": [],
+            "comentarios": [],
+            "hospitalizaciones": [],
+            "observaciones": ""
+        }
+
+        db.Pacientes.insert_one(nuevo_historial)
+        return JsonResponse({'mensaje': 'Nueva instancia creada', 'id': str(historial_id)}, status=201)
+    except Exception as e:
+        print(f"Error al agregar historial médico vacío: {e}")
+        return JsonResponse({'error': 'Error al agregar historial médico vacío'}, status=500)
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_tratamiento(request, paciente_id):
+    db = connect_to_mongodb()
+
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    if paciente:
+        tratamiento_id = get_next_sequence_value(db, "tratamiento_id")
+        tratamiento_nuevo = {
+            "tratamiento_id": tratamiento_id,
+            "medico_id": request.data.get('medico_id', ''),
+            "descripcion": request.data.get('descripcion', ''),
+            "medicacion": request.data.get('medicacion', []),
+            "procedimientos": request.data.get('procedimientos', []),
+            "comentarios": request.data.get('comentarios', []),
+            "recomendaciones": request.data.get('recomendaciones', ''),
+            "fecha_inicio": request.data.get('fecha_inicio', ''),
+            "fecha_fin": request.data.get('fecha_fin', '')
+        }
+        
+        db.Pacientes.update_one({'paciente_id': int(paciente_id)}, {'$push': {'tratamientos': tratamiento_nuevo}})
+        return JsonResponse({"message": "Tratamiento agregado correctamente"}, safe=False, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_hospitalizacion(request, paciente_id):
+    db = connect_to_mongodb()
+
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    if paciente:
+        hospitalizacion_id = get_next_sequence_value(db, "hospitalizacion_id")
+        hospitalizacion_data = json.loads(request.body)
+        hospitalizacion_nueva = {
+            "hospitalizacion_id": hospitalizacion_id,
+            "medico_id": hospitalizacion_data.get('medico_id', ''),
+            "fecha_ingreso": hospitalizacion_data.get('fecha_ingreso', ''),
+            "fecha_alta": hospitalizacion_data.get('fecha_alta', ''),
+            "detalles_tratamiento": hospitalizacion_data.get('detalles_tratamiento', '')
+        }
+
+        db.Pacientes.update_one({'paciente_id': int(paciente_id)}, {'$push': {'hospitalizaciones': hospitalizacion_nueva}})
+        return JsonResponse({"message": "Hospitalización agregada correctamente"}, safe=False, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_comentario_tratamiento(request, paciente_id, tratamiento_id):
+    db = connect_to_mongodb()
+
+    paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+
+    if paciente:
+        comentario_data = request.POST
+        comentario_nuevo = {
+            "medico_id": comentario_data.get('medico_id', ''),
+            "medico_nombre": comentario_data.get('medico_nombre', ''),
+            "comentario": comentario_data.get('comentario', ''),
+            "fecha": comentario_data.get('fecha', '')
+        }
+
+        db.Pacientes.update_one(
+            {'paciente_id': int(paciente_id), 'tratamientos.tratamiento_id': int(tratamiento_id)},
+            {'$push': {'tratamientos.$.comentarios': comentario_nuevo}}
+        )
+
+        return JsonResponse({"message": "Comentario agregado correctamente"}, status=200)
+    else:
+        context = {'error': 'No se encontró el paciente'}
+        return JsonResponse(context, status=404)
+
+@csrf_exempt
+@api_view(['POST'])
+def agregar_diagnostico(request, paciente_id):
+    try:
+        db = connect_to_mongodb()
+        if db is None:
+            return JsonResponse({'error': 'No se pudo conectar a MongoDB'}, status=500)
+
+        paciente = db.Pacientes.find_one({'paciente_id': int(paciente_id)})
+        if not paciente:
+            return JsonResponse({'error': 'No se encontró el paciente'}, status=404)
+
+        fecha = request.data.get('fecha')
+        diagnostico = request.data.get('diagnostico')
+
+        if not all([fecha, diagnostico]):
+            return JsonResponse({'error': 'Faltan campos requeridos'}, status=400)
+
+        diagnostico_id = get_next_sequence_value(db, "diagnostico_id")
+        nuevo_diagnostico = {
+            'diagnostico_id': diagnostico_id,
+            'fecha': fecha,
+            'diagnostico': diagnostico
+        }
+
+        db.Pacientes.update_one(
+            {'paciente_id': int(paciente_id)},
+            {'$push': {'diagnosticos': nuevo_diagnostico}}
+        )
+
+        return JsonResponse({'mensaje': 'Diagnóstico agregado correctamente'}, safe=False, status=200)
+    except Exception as e:
+        print(f"Error al agregar diagnóstico: {e}")
+        return JsonResponse({'error': 'Error al agregar diagnóstico'}, status=500)
+    
